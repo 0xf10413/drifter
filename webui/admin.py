@@ -1,3 +1,7 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import MachType, Phase, Server
+
+admin.site.register(MachType)
+admin.site.register(Phase)
+admin.site.register(Server)
