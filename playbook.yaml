@@ -19,6 +19,10 @@
         msg: Task that changes when the server is a certain machtype!
       changed_when: mach_type == "FLO"
 
+    - name: Task that can fail
+      assert:
+        that: mach_type != "TIM"
+
     - name: A new task that always changes!
       debug:
         msg: A new task that always changes!

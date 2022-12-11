@@ -1,7 +1,7 @@
 from django.http import HttpResponse
 from django.shortcuts import render
 from . import models, forms
-from django.db.models import Min
+from django.db.models import Avg, Max
 from django.db.models.expressions import F
 from django.db.models.functions import Concat
 from django.db.models import Value as V
@@ -10,6 +10,7 @@ import logging
 import datetime as dt
 from collections import OrderedDict, defaultdict
 import statistics
+from typing import Optional
 
 
 def index(request):
@@ -23,7 +24,8 @@ def index(request):
             "datetime", "server__phase__name", "server__mach_type__name"
         )
         .annotate(
-            min=Min("nb_change"),
+            avg_change=Avg("nb_change"),
+            max_fail=Max("nb_fail"),
             phase=F("server__phase__name"),
             mach_type=F("server__mach_type__name"),
             group_name=Concat("mach_type", V(" - "), "phase"),
@@ -35,7 +37,9 @@ def index(request):
     # { datetime: datetime1, series1: value1, series2: value2, ...}
     datapoints = defaultdict(dict)
     for result in queryset:
-        datapoints[result["datetime"]][result["group_name"] + "_min"] = result["min"]
+        datapoint = datapoints[result["datetime"]]
+        datapoint[result["group_name"] + "_avg_change"] = result["avg_change"]
+        datapoint[result["group_name"] + "_max_fail"] = result["max_fail"]
     context["datapoints"] = dict(datapoints)
     context["group_names"] = {result["group_name"] for result in queryset}
     return render(request, "webui/index.html", context)
@@ -52,6 +56,7 @@ class PlayMetadata(pydantic.BaseModel):
 
 class TaskHost(pydantic.BaseModel):
     changed: bool
+    failed: Optional[bool]
 
 
 class TaskData(pydantic.BaseModel):
@@ -88,7 +93,7 @@ def upload(request):
             return render(request, "webui/upload.html", context)
 
         playbook_output = PlaybookOutput.parse_raw(request.FILES["file_name"].read())
-        logging.critical("Got playbook: %s", playbook_output)
+        logging.debug("Got playbook: %s", playbook_output)
         handle_new_ansible_input(playbook_output)
 
     # Prepare a new upload
@@ -104,7 +109,7 @@ def handle_new_ansible_input(output: PlaybookOutput) -> None:
     stats_per_host: dict[str, models.NbChanges] = {}
     play_start = output.plays[0].play.duration.start
     for hostname, stat in output.custom_stats.items():
-        logging.warning(
+        logging.info(
             "Detected host %s, which is a %s in phase %s",
             hostname,
             stat.mach_type,
@@ -122,14 +127,18 @@ def handle_new_ansible_input(output: PlaybookOutput) -> None:
             server=host, datetime=play_start
         )
         nb_changes.nb_change = 0
+        nb_changes.nb_fail = 0
         stats_per_host[hostname] = nb_changes
 
     # Update change statistic
     for play in output.plays:
         for task in play.tasks:
             for hostname, host in task.hosts.items():
-                if hostname in stats_per_host and host.changed:
-                    stats_per_host[hostname].nb_change += 1
+                if hostname in stats_per_host:
+                    if host.changed:
+                        stats_per_host[hostname].nb_change += 1
+                    if host.failed:
+                        stats_per_host[hostname].nb_fail += 1
 
     # Save everything
     for stat in stats_per_host.values():

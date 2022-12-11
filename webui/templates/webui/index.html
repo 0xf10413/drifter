@@ -6,37 +6,67 @@
 </head>
 
 <body>
+    <h1>Failures</h1>
+    <div id="chartdiv-fails" style="height: 500px;"></div>
     <h1>Differences w.r.t. reference configuration per machtype and phase</h1>
-    <div id="chartdiv" style="height: 500px;"></div>
+    <div id="chartdiv-changes" style="height: 500px;"></div>
     <script>
-        var chart = am4core.create("chartdiv", am4charts.XYChart);
+        var chartChanges = am4core.create("chartdiv-changes", am4charts.XYChart);
+        var chartFails = am4core.create("chartdiv-fails", am4charts.XYChart);
 
-        var dateAxis = chart.xAxes.push(new am4charts.DateAxis());
+        var dateAxis = chartChanges.xAxes.push(new am4charts.DateAxis());
         dateAxis.baseInterval = {
             "timeUnit": "minute",
             "count": 1,
         }
         dateAxis.max = Date.now();
-        var valueAxis = chart.yAxes.push(new am4charts.ValueAxis());
+
+        var dateAxis = chartFails.xAxes.push(new am4charts.DateAxis());
+        dateAxis.baseInterval = {
+            "timeUnit": "minute",
+            "count": 1,
+        }
+        dateAxis.max = Date.now();
+
+
+        var valueAxis = chartChanges.yAxes.push(new am4charts.ValueAxis());
         valueAxis.min = 0;
+
+        var valueAxis = chartFails.yAxes.push(new am4charts.ValueAxis());
+        valueAxis.min = 0;
+
 
         group_names = [
             {% for group_name in group_names %}"{{ group_name }}", {% endfor %}
         ]
         for (const group_name of new Set(group_names)) {
-            series = chart.series.push(new am4charts.LineSeries());
-            series.dataFields.valueY = group_name + "_min";
+            series = chartChanges.series.push(new am4charts.LineSeries());
+            series.dataFields.valueY = group_name + "_avg_change";
             series.dataFields.dateX = "datetime";
-            series.tooltipText = group_name;
-            series.name = group_name;
+            series.tooltipText = "Changes - " + group_name;
+            series.name = "Changes - " + group_name;
             series.bullets.push(new am4charts.CircleBullet());
+
+            series = chartFails.series.push(new am4charts.LineSeries());
+            series.dataFields.valueY = group_name + "_max_fail";
+            series.dataFields.dateX = "datetime";
+            series.tooltipText = "Failures - " + group_name;
+            series.name = "Failures - " + group_name;
+            var bullet = series.bullets.push(new am4charts.Bullet());
+            var square = bullet.createChild(am4core.Triangle);
+            square.width = square.height = 10;
+            square.horizontalCenter = "middle";
+            square.verticalCenter = "middle";
         }
 
-        chart.cursor = new am4charts.XYCursor();
-        chart.legend = new am4charts.Legend();
+        chartChanges.cursor = new am4charts.XYCursor();
+        chartChanges.legend = new am4charts.Legend();
+
+        chartFails.cursor = new am4charts.XYCursor();
+        chartFails.legend = new am4charts.Legend();
 
         // Define data
-        chart.data = [
+        chartChanges.data = [
             {% for datetime, datapoint in datapoints.items %}
         {
             "datetime": new Date("{{ datetime.isoformat }}"),
@@ -46,5 +76,6 @@
         },
         {% endfor %}
         ];
+        chartFails.data = chartChanges.data;
     </script>
 </body>
