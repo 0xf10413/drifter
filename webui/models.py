@@ -19,3 +19,11 @@ class Server(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+class NbChanges(models.Model):
+    server = models.ForeignKey(Server, on_delete=models.CASCADE)
+    datetime = models.DateTimeField()
+    nb_change = models.IntegerField()
+
+    class Meta:
+        unique_together = ("server", "datetime")

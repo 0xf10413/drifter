@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+
+<head>
+</head>
+
+<body>
+    <h1>Servers</h1>
+    <ul>
+        {% for server in servers %}
+        <li>{{ server }} ({{ server.phase }} - {{ server.mach_type }})</li>
+        {% endfor %}
+    </ul>
+</body>

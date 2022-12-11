@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+
+<head>
+</head>
+
+<body>
+<h1>Upload new data</h1>
+
+<form enctype="multipart/form-data" action="{% url 'upload' %}" method="post">
+    {% csrf_token %}
+    <table>
+        {{ form }}
+    </table>
+    <input type="submit" value="Submit">
+</form>
+</body>

@@ -1,0 +1,16 @@
+- hosts: all
+  connection: local
+  tasks:
+    - name: Record mach_type and phase for later analysis
+      ansible.builtin.set_stats:
+        data:
+          mach_type: "{{ mach_type }}"
+          phase: "{{ phase }}"
+        per_host: yes
+    - name: Task that never changes
+      debug:
+        msg: Something that never changes!
+    - name: Task that always changes
+      debug:
+        msg: Something that always changes!
+      changed_when: true
