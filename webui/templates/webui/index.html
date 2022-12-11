@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+
+<head>
+    <script src="https://cdn.amcharts.com/lib/4/core.js"></script>
+    <script src="https://cdn.amcharts.com/lib/4/charts.js"></script>
+</head>
+
+<body>
+    <h1>Differences w.r.t. reference configuration per machtype and phase</h1>
+    <div id="chartdiv" style="height: 500px;"></div>
+    <script>
+        var chart = am4core.create("chartdiv", am4charts.XYChart);
+
+        var dateAxis = chart.xAxes.push(new am4charts.DateAxis());
+        dateAxis.baseInterval = {
+            "timeUnit": "minute",
+            "count": 1,
+        }
+        dateAxis.max = Date.now();
+        var valueAxis = chart.yAxes.push(new am4charts.ValueAxis());
+        valueAxis.min = 0;
+
+        group_names = [
+            {% for group_name in group_names %}"{{ group_name }}", {% endfor %}
+        ]
+        for (const group_name of new Set(group_names)) {
+            series = chart.series.push(new am4charts.LineSeries());
+            series.dataFields.valueY = group_name + "_min";
+            series.dataFields.dateX = "datetime";
+            series.tooltipText = group_name;
+            series.name = group_name;
+            series.bullets.push(new am4charts.CircleBullet());
+        }
+
+        chart.cursor = new am4charts.XYCursor();
+        chart.legend = new am4charts.Legend();
+
+        // Define data
+        chart.data = [
+            {% for datetime, datapoint in datapoints.items %}
+        {
+            "datetime": new Date("{{ datetime.isoformat }}"),
+                {% for k, v in datapoint.items %}
+        "{{ k }}": {{ v }},
+        {% endfor %}
+        },
+        {% endfor %}
+        ];
+    </script>
+</body>
