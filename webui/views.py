@@ -63,15 +63,28 @@ def upload(request):
 
 def handle_new_ansible_input(output: PlaybookOutput) -> None:
     # Identify the machines, using custom stats
-    stats_per_host = {}
+    stats_per_host: dict[str, models.NbChanges] = {}
+    play_start = output.plays[0].play.duration.start
     for hostname, stat in output.custom_stats.items():
         logging.warning("Detected host %s, which is a %s in phase %s", hostname, stat.mach_type, stat.phase)
+        # Update machine configuration
         mach_type, _ = models.MachType.objects.update_or_create(name=stat.mach_type)
         phase, _ = models.Phase.objects.update_or_create(name=stat.phase)
         host, _ = models.Server.objects.update_or_create(mach_type=mach_type, phase=phase, name=hostname)
-        stat = models.NbChanges.objects.get_or_create(server=host, datetime=output.plays[0].play.duration.start)
+        
+        # Retrieve change statistic corresponding to this playbook, if any, and reinitialize it
+        nb_changes, _ = models.NbChanges.objects.get_or_create(server=host, datetime=play_start)
+        nb_changes.nb_change = 0
+        stats_per_host[hostname] = nb_changes
 
-        stats_per_host[hostname] = stat
+    # Update change statistic
+    for play in output.plays:
+        for task in play.tasks:
+            for hostname, host in task.hosts.items():
+                if hostname in stats_per_host and host.changed:
+                    stats_per_host[hostname].nb_change += 1
 
-    # Update statistics
+    # Save everything
+    for stat in stats_per_host.values():
+        stat.save()
 

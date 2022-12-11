@@ -23,7 +23,7 @@ class Server(models.Model):
 class NbChanges(models.Model):
     server = models.ForeignKey(Server, on_delete=models.CASCADE)
     datetime = models.DateTimeField()
-    nb_change = models.IntegerField()
+    nb_change = models.IntegerField(default=0)
 
     class Meta:
         unique_together = ("server", "datetime")
