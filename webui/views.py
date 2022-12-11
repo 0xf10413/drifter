@@ -4,11 +4,48 @@ from . import models, forms
 import pydantic
 import logging
 import datetime as dt
+from collections import OrderedDict, defaultdict
+import statistics
 
 def index(request):
     context = {
         "servers": models.Server.objects.all(),
     }
+
+    # Gather data points for each date, grouped by (mach_type, phase).
+    raw_values_per_date = OrderedDict()
+    for stat in models.NbChanges.objects.order_by("-datetime").all():
+        if stat.datetime not in raw_values_per_date:
+            raw_values_per_date[stat.datetime] = defaultdict(list)
+        raw_values_per_date[stat.datetime][stat.server.mach_type.name,stat.server.phase.name].append(stat.nb_change)
+
+    # Convert raw values into max, min, ...
+    values_per_date = {}
+    groups = []
+    for datetime, grouped_stats in raw_values_per_date.items():
+        if datetime not in values_per_date:
+            values_per_date[datetime] = {}
+        for stat_group_name, stat_group in grouped_stats.items():
+            if stat_group_name not in groups:
+                groups.append(stat_group_name)
+            values_per_date[datetime][stat_group_name] = {
+                "min": min(stat_group),
+                "max": max(stat_group),
+                "mean": statistics.mean(stat_group)
+            }
+
+    # Need to format data as a list of objets:
+    # { datetime: datetime1, server1: value1, server2: value2, ...}
+    datapoints = []
+    for datetime, values in values_per_date.items():
+        datapoints.append(
+            {
+                "datetime": datetime,
+                **values,
+            }
+        )
+    context["datapoints"] = datapoints
+    context["groups"] = [f"{group[0]} - {group[1]}" for group in groups]
     return render(request, "webui/index.html.j2", context)
 
 class PlayDuration(pydantic.BaseModel):
